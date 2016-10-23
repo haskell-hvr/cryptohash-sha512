@@ -226,7 +226,7 @@ hashlazy l = unsafeDoIO $ withCtxNewThrow $ \ptr -> do
 
 {-# NOINLINE hmac #-}
 -- | Compute 64-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
--- HMAC-SHA1 digest for a strict bytestring message
+-- HMAC-SHA-512 digest for a strict bytestring message
 --
 -- @since 0.11.100.0
 hmac :: ByteString -- ^ secret
@@ -244,7 +244,7 @@ hmac secret msg = hash $ B.append opad (hash $ B.append ipad msg)
 
 {-# NOINLINE hmaclazy #-}
 -- | Compute 64-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
--- HMAC-SHA1 digest for a lazy bytestring message
+-- HMAC-SHA-512 digest for a lazy bytestring message
 --
 -- @since 0.11.100.0
 hmaclazy :: ByteString   -- ^ secret
