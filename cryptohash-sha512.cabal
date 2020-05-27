@@ -69,7 +69,7 @@ test-suite test-sha512
 
                    , base16-bytestring >= 0.1.1  && < 0.2
                    , SHA               >= 1.6.4  && < 1.7
-                   , tasty             == 0.11.* || == 0.12.* || == 1.0.*
+                   , tasty             >= 0.11   && < 1.4
                    , tasty-quickcheck  >= 0.8    && < 0.11
                    , tasty-hunit       >= 0.9    && < 0.11
 
@@ -81,4 +81,4 @@ benchmark bench-sha512
   build-depends:     cryptohash-sha512
                    , base
                    , bytestring
-                   , criterion        >= 1.1 && <1.5
+                   , criterion        >= 1.1 && <1.6
