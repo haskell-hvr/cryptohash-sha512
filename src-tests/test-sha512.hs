@@ -109,7 +109,7 @@ rfc4231Vectors = -- (secrect,msg,mac)
     , (rep 131 0xaa, "This is a test using a larger than block-size key and a larger than block-size data. The key needs to be hashed before being used by the HMAC algorithm.", x"e37b6a775dc87dbaa4dfa9f96e5e3ffddebd71f8867289865df5a32d20cdc944b6022cac3c4982b10d5eeb55c3e4de15134676fb6de0446065c97440fa8c6a58")
     ]
   where
-    x = fst.B16.decode
+    x = B16.decodeLenient
     rep n c = B.replicate n c
 
 rfc4231Tests :: [TestTree]
