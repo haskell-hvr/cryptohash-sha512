@@ -125,12 +125,6 @@ digestSize = 64
 sizeCtx :: Int
 sizeCtx = 208
 
-{-# RULES "digestSize" B.length (finalize init) = digestSize #-}
-{-# RULES "hash" forall b. finalize (update init b) = hash b #-}
-{-# RULES "hash.list1" forall b. finalize (updates init [b]) = hash b #-}
-{-# RULES "hashmany" forall b. finalize (foldl update init b) = hashlazy (L.fromChunks b) #-}
-{-# RULES "hashlazy" forall b. finalize (foldl update init $ L.toChunks b) = hashlazy b #-}
-
 {-# INLINE withByteStringPtr #-}
 withByteStringPtr :: ByteString -> (Ptr Word8 -> IO a) -> IO a
 withByteStringPtr b f =
