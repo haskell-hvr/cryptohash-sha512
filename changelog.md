@@ -3,7 +3,7 @@
  - Add Eq instance for Ctx
  - add start and startlazy producing Ctx
  - Remove ineffective RULES
- - Declare `Crypto.Hash.MD5` module `-XTrustworthy`
+ - Declare `Crypto.Hash.SHA512` module `-XTrustworthy`
  - Convert to `CApiFFI`
  - Added `...AndLength` variants of hashing functions:
 
