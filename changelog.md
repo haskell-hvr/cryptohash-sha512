@@ -1,3 +1,8 @@
+## 0.11.102.0
+
+ - Expose SHA512/t variant via new `Crypto.Hash.SHA512t` module
+ - Expose SHA384 variant via new `Crypto.Hash.SHA384` module
+
 ## 0.11.101.0
 
  - Add Eq instance for Ctx

@@ -26,7 +26,9 @@
 #ifndef CRYPTOHASH_SHA512_H
 #define CRYPTOHASH_SHA512_H
 
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stddef.h>
 #include <assert.h>
 #include <string.h>
@@ -42,11 +44,22 @@ struct sha512_ctx
 
 /* keep this synchronised with 'digestSize'/'sizeCtx' in SHA512.hs */
 #define SHA512_DIGEST_SIZE	64
+#define SHA512t_DIGEST_SIZE(t)	(((t)+7)/8)
+#define SHA384_DIGEST_SIZE	48
 #define SHA512_CTX_SIZE		208
 
+/* NB: SHA384 and SHA512/t are essentially the same algorithm as SHA512 and
+ * therefore share the same data structures and most of the codepaths
+ * except for different initialization data and truncating the 512bit
+ * digest down to the respective digest bit-length.
+ */
+static inline void hs_cryptohash_sha384_init(struct sha512_ctx *ctx);
 static inline void hs_cryptohash_sha512_init (struct sha512_ctx *ctx);
+static inline void hs_cryptohash_sha512t_init(struct sha512_ctx *ctx, const uint16_t t);
+
 static inline void hs_cryptohash_sha512_update (struct sha512_ctx *ctx, const uint8_t *data, size_t len);
-static inline uint64_t hs_cryptohash_sha512_finalize (struct sha512_ctx *ctx, uint8_t *out);
+
+static inline uint64_t hs_cryptohash_sha512t_finalize (struct sha512_ctx *ctx, uint16_t outbits, uint8_t *out);
 
 #if defined(static_assert)
 static_assert(sizeof(struct sha512_ctx) == SHA512_CTX_SIZE, "unexpected sha512_ctx size");
@@ -95,7 +108,7 @@ static inline void
 hs_cryptohash_sha512_init (struct sha512_ctx *ctx)
 {
   memset(ctx, 0, SHA512_CTX_SIZE);
-  
+
   ctx->h[0] = 0x6a09e667f3bcc908ULL;
   ctx->h[1] = 0xbb67ae8584caa73bULL;
   ctx->h[2] = 0x3c6ef372fe94f82bULL;
@@ -105,6 +118,76 @@ hs_cryptohash_sha512_init (struct sha512_ctx *ctx)
   ctx->h[6] = 0x1f83d9abfb41bd6bULL;
   ctx->h[7] = 0x5be0cd19137e2179ULL;
 }
+
+static inline void
+hs_cryptohash_sha384_init (struct sha512_ctx *ctx)
+{
+  memset(ctx, 0, SHA512_CTX_SIZE);
+
+  ctx->h[0] = 0xcbbb9d5dc1059ed8ULL;
+  ctx->h[1] = 0x629a292a367cd507ULL;
+  ctx->h[2] = 0x9159015a3070dd17ULL;
+  ctx->h[3] = 0x152fecd8f70e5939ULL;
+  ctx->h[4] = 0x67332667ffc00b31ULL;
+  ctx->h[5] = 0x8eb44a8768581511ULL;
+  ctx->h[6] = 0xdb0c2e0d64f98fa7ULL;
+  ctx->h[7] = 0x47b5481dbefa4fa4ULL;
+}
+
+static inline void
+hs_cryptohash_sha512t_init(struct sha512_ctx *ctx, const uint16_t t)
+{
+  memset(ctx, 0, SHA512_CTX_SIZE);
+
+  if (!((0 < t) && (t < 512)))
+    return;
+
+  /* shortcuts for the currently two FIPS 180-4 "approved" parameters */
+  switch (t) {
+  case 224:
+    ctx->h[0] = 0x8c3d37c819544da2ULL;
+    ctx->h[1] = 0x73e1996689dcd4d6ULL;
+    ctx->h[2] = 0x1dfab7ae32ff9c82ULL;
+    ctx->h[3] = 0x679dd514582f9fcfULL;
+    ctx->h[4] = 0x0f6d2b697bd44da8ULL;
+    ctx->h[5] = 0x77e36f7304c48942ULL;
+    ctx->h[6] = 0x3f9d85a86a1d36c8ULL;
+    ctx->h[7] = 0x1112e6ad91d692a1ULL;
+    return;
+
+  case 256:
+    ctx->h[0] = 0x22312194fc2bf72cULL;
+    ctx->h[1] = 0x9f555fa3c84c64c2ULL;
+    ctx->h[2] = 0x2393b86b6f53b151ULL;
+    ctx->h[3] = 0x963877195940eabdULL;
+    ctx->h[4] = 0x96283ee2a88effe3ULL;
+    ctx->h[5] = 0xbe5e1e2553863992ULL;
+    ctx->h[6] = 0x2b0199fc2c85b8aaULL;
+    ctx->h[7] = 0x0eb72ddc81c52ca2ULL;
+    return;
+  }
+
+  /* slow path */
+  hs_cryptohash_sha512_init(ctx);
+  for (int i = 0; i < 8; i++)
+    ctx->h[i] ^= 0xa5a5a5a5a5a5a5a5ULL;
+
+  uint64_t out[8] = { 0, };
+
+  {
+    char buf[16] = { 0, };
+    const int bufsz = snprintf(buf, 16, "SHA-512/%d", t);
+    hs_cryptohash_sha512_update(ctx, (uint8_t*)buf, bufsz);
+    hs_cryptohash_sha512t_finalize(ctx, 512, (uint8_t*)out);
+  }
+
+  /* re-init the context, otherwise len is changed */
+  memset(ctx, 0, SHA512_CTX_SIZE);
+  for (int i = 0; i < 8; i++)
+    ctx->h[i] = cpu_to_be64(out[i]);
+
+}
+
 
 /* 232 times the cube root of the first 64 primes 2..311 */
 static const uint64_t k[] = {
@@ -146,7 +229,7 @@ static void
 sha512_do_chunk_aligned(struct sha512_ctx *ctx, uint64_t w[])
 {
   int i;
-  
+
   for (i = 16; i < 80; i++)
     w[i] = s1(w[i - 2]) + w[i - 7] + s0(w[i - 15]) + w[i - 16];
 
@@ -239,7 +322,7 @@ hs_cryptohash_sha512_update(struct sha512_ctx *ctx, const uint8_t *data, size_t 
 }
 
 static inline uint64_t
-hs_cryptohash_sha512_finalize (struct sha512_ctx *ctx, uint8_t *out)
+hs_cryptohash_sha512t_finalize (struct sha512_ctx *ctx, uint16_t outbits, uint8_t *out)
 {
   static const uint8_t padding[128] = { 0x80, };
   const uint64_t sz = ctx->sz;
@@ -258,7 +341,34 @@ hs_cryptohash_sha512_finalize (struct sha512_ctx *ctx, uint8_t *out)
   hs_cryptohash_sha512_update(ctx, (uint8_t *) bits, sizeof(bits));
 
   /* output hash */
-  cpu_to_be64_array((uint64_t *) out, ctx->h, 8);
+  if (outbits > 512)
+    outbits = 512; /* clamp to <= 512; better safe than sorry */
+
+  if(outbits % 64 == 0) {
+    /* fast path for 0,64,128,192,256,320,384,448,512 */
+    cpu_to_be64_array((uint64_t *) out, ctx->h, outbits/64);
+  } else {
+    /* slow-path */
+    uint8_t buf[SHA512_DIGEST_SIZE] = { 0x00, };
+    cpu_to_be64_array((uint64_t *) buf, ctx->h, 8);
+
+    const unsigned outbytes = SHA512t_DIGEST_SIZE(outbits);
+    assert(outbytes > 0);
+    assert(outbytes <= SHA512_DIGEST_SIZE);
+
+    /* Handle case of t parameter not being an integral amount of
+     * octects.  FIPS 180-4 states that "the resulting message digest
+     * is truncated by selecting an appropriate number of the leftmost
+     * bits". Hence in such a case we apply a mask to retain the
+     * appropriate number of leftmost bits in the rightmost retained
+     * octet.
+     */
+    const uint8_t outmask = ~(((uint8_t)0xff) >> (outbits % 8));
+    if (outmask)
+      buf[outbytes-1] &= outmask;
+
+    memcpy(out, buf, outbytes);
+  }
 
   return sz;
 }
@@ -272,7 +382,34 @@ hs_cryptohash_sha512_hash (const uint8_t *data, size_t len, uint8_t *out)
 
   hs_cryptohash_sha512_update(&ctx, data, len);
 
-  hs_cryptohash_sha512_finalize(&ctx, out);
+  hs_cryptohash_sha512t_finalize(&ctx, 512, out);
 }
+
+static inline void
+hs_cryptohash_sha384_hash (const uint8_t *data, size_t len, uint8_t *out)
+{
+  struct sha512_ctx ctx;
+
+  hs_cryptohash_sha384_init(&ctx);
+
+  hs_cryptohash_sha512_update(&ctx, data, len);
+
+  hs_cryptohash_sha512t_finalize(&ctx, 384, out);
+}
+
+static inline void
+hs_cryptohash_sha512t_hash (const uint8_t *data, size_t len, uint8_t *out, const uint16_t outbits)
+{
+  struct sha512_ctx ctx;
+
+  if (!(0 < outbits && outbits < 512)) return;
+
+  hs_cryptohash_sha512t_init(&ctx, outbits);
+
+  hs_cryptohash_sha512_update(&ctx, data, len);
+
+  hs_cryptohash_sha512t_finalize(&ctx, outbits, out);
+}
+
 
 #endif

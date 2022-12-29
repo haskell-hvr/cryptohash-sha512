@@ -1,14 +1,15 @@
 {-# LANGUAGE Trustworthy #-}
 -- |
--- Module      : Crypto.Hash.SHA512
+-- Module      : Crypto.Hash.SHA384
 -- License     : BSD-style
 -- Maintainer  : Herbert Valerio Riedel <hvr@gnu.org>
 -- Stability   : stable
 -- Portability : unknown
 --
--- A module containing <https://en.wikipedia.org/wiki/SHA-2 SHA-512> bindings
+-- A module containing <https://en.wikipedia.org/wiki/SHA-2 SHA-384> bindings
 --
-module Crypto.Hash.SHA512
+-- @since 0.11.102.0
+module Crypto.Hash.SHA384
     (
 
     -- * Incremental API
@@ -28,13 +29,13 @@ module Crypto.Hash.SHA512
     -- Example:
     --
     -- > import qualified Data.ByteString
-    -- > import qualified Crypto.Hash.SHA512 as SHA512
+    -- > import qualified Crypto.Hash.SHA384 as SHA384
     -- >
     -- > main = print digest
     -- >   where
-    -- >     digest = SHA512.finalize ctx
-    -- >     ctx    = foldl SHA512.update ctx0 (map Data.ByteString.pack [ [1,2,3], [4,5,6] ])
-    -- >     ctx0   = SHA512.init
+    -- >     digest = SHA384.finalize ctx
+    -- >     ctx    = foldl SHA384.update ctx0 (map Data.ByteString.pack [ [1,2,3], [4,5,6] ])
+    -- >     ctx0   = SHA384.init
 
       Ctx(..)
     , init     -- :: Ctx
@@ -58,9 +59,9 @@ module Crypto.Hash.SHA512
     -- Example:
     --
     -- > import qualified Data.ByteString
-    -- > import qualified Crypto.Hash.SHA512 as SHA512
+    -- > import qualified Crypto.Hash.SHA384 as SHA384
     -- >
-    -- > main = print $ SHA512.hash (Data.ByteString.pack [0..255])
+    -- > main = print $ SHA384.hash (Data.ByteString.pack [0..255])
     --
     -- __NOTE__: The returned digest is a binary 'ByteString'. For
     -- converting to a base16/hex encoded digest the
@@ -71,10 +72,10 @@ module Crypto.Hash.SHA512
     , hashlazy -- :: L.ByteString -> ByteString
     , hashlazyAndLength -- :: L.ByteString -> (ByteString,Word64)
 
-    -- ** HMAC-SHA-512
+    -- ** HMAC-SHA-384
     --
     -- | <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
-    -- <https://en.wikipedia.org/wiki/HMAC HMAC>-SHA-512 digests
+    -- <https://en.wikipedia.org/wiki/HMAC HMAC>-SHA-384 digests
 
     , hmac     -- :: ByteString -> ByteString -> ByteString
     , hmaclazy -- :: ByteString -> L.ByteString -> ByteString
@@ -109,7 +110,7 @@ unsafeDoIO = unsafeDupablePerformIO
 -- keep this synchronised with cbits/sha512.h
 {-# INLINE digestSize #-}
 digestSize :: Int
-digestSize = 64
+digestSize = 48
 
 {-# INLINE sizeCtx #-}
 sizeCtx :: Int
@@ -161,25 +162,25 @@ c_sha512_update pctx pbuf sz
   | otherwise = c_sha512_update_safe   pctx pbuf sz
 
 -- 'safe' call overhead neglible for 4KiB and more
-c_sha512_hash :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
-c_sha512_hash pbuf sz pout
-  | sz < 4096 = c_sha512_hash_unsafe pbuf sz pout
-  | otherwise = c_sha512_hash_safe   pbuf sz pout
+c_sha384_hash :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
+c_sha384_hash pbuf sz pout
+  | sz < 4096 = c_sha384_hash_unsafe pbuf sz pout
+  | otherwise = c_sha384_hash_safe   pbuf sz pout
 
 updateInternalIO :: Ptr Ctx -> ByteString -> IO ()
 updateInternalIO ptr d =
     unsafeUseAsCStringLen d (\(cs, len) -> c_sha512_update ptr (castPtr cs) (fromIntegral len))
 
 finalizeInternalIO :: Ptr Ctx -> IO ByteString
-finalizeInternalIO ptr = create digestSize (c_sha512t_finalize ptr 512)
+finalizeInternalIO ptr = create digestSize (c_sha512t_finalize ptr 384)
 
 finalizeInternalIO' :: Ptr Ctx -> IO (ByteString,Word64)
-finalizeInternalIO' ptr = create' digestSize (c_sha512t_finalize_len ptr 512)
+finalizeInternalIO' ptr = create' digestSize (c_sha512t_finalize_len ptr 384)
 
 {-# NOINLINE init #-}
 -- | create a new hash context
 init :: Ctx
-init = unsafeDoIO $ withCtxNew $ c_sha512_init
+init = unsafeDoIO $ withCtxNew $ c_sha384_init
 
 validCtx :: Ctx -> Bool
 validCtx (Ctx b) = B.length b == sizeCtx
@@ -189,72 +190,62 @@ validCtx (Ctx b) = B.length b == sizeCtx
 update :: Ctx -> ByteString -> Ctx
 update ctx d
   | validCtx ctx = unsafeDoIO $ withCtxCopy ctx $ \ptr -> updateInternalIO ptr d
-  | otherwise    = error "SHA512.update: invalid Ctx"
+  | otherwise    = error "SHA384.update: invalid Ctx"
 
 {-# NOINLINE updates #-}
 -- | updates a context with multiple bytestrings
 updates :: Ctx -> [ByteString] -> Ctx
 updates ctx d
   | validCtx ctx = unsafeDoIO $ withCtxCopy ctx $ \ptr -> mapM_ (updateInternalIO ptr) d
-  | otherwise    = error "SHA512.updates: invalid Ctx"
+  | otherwise    = error "SHA384.updates: invalid Ctx"
 
 {-# NOINLINE finalize #-}
--- | finalize the context into a digest bytestring (64 bytes)
+-- | finalize the context into a digest bytestring (48 bytes)
 finalize :: Ctx -> ByteString
 finalize ctx
   | validCtx ctx = unsafeDoIO $ withCtxThrow ctx finalizeInternalIO
-  | otherwise    = error "SHA512.finalize: invalid Ctx"
+  | otherwise    = error "SHA384.finalize: invalid Ctx"
 
 {-# NOINLINE finalizeAndLength #-}
 -- | Variant of 'finalize' also returning length of hashed content
---
--- @since 0.11.101.0
 finalizeAndLength :: Ctx -> (ByteString,Word64)
 finalizeAndLength ctx
   | validCtx ctx = unsafeDoIO $ withCtxThrow ctx finalizeInternalIO'
-  | otherwise    = error "SHA512.finalize: invalid Ctx"
+  | otherwise    = error "SHA384.finalize: invalid Ctx"
 
 {-# NOINLINE hash #-}
--- | hash a strict bytestring into a digest bytestring (64 bytes)
+-- | hash a strict bytestring into a digest bytestring (48 bytes)
 hash :: ByteString -> ByteString
--- hash d = unsafeDoIO $ withCtxNewThrow $ \ptr -> do c_sha512_init ptr >> updateInternalIO ptr d >> finalizeInternalIO ptr
-hash d = unsafeDoIO $ unsafeUseAsCStringLen d $ \(cs, len) -> create digestSize (c_sha512_hash (castPtr cs) (fromIntegral len))
+-- hash d = unsafeDoIO $ withCtxNewThrow $ \ptr -> do c_sha384_init ptr >> updateInternalIO ptr d >> finalizeInternalIO ptr
+hash d = unsafeDoIO $ unsafeUseAsCStringLen d $ \(cs, len) -> create digestSize (c_sha384_hash (castPtr cs) (fromIntegral len))
 
 {-# NOINLINE start #-}
 -- | hash a strict bytestring into a Ctx
---
--- @since 0.11.101.0
 start :: ByteString -> Ctx
 start d = unsafeDoIO $ withCtxNew $ \ptr -> do
-    c_sha512_init ptr >> updateInternalIO ptr d
+    c_sha384_init ptr >> updateInternalIO ptr d
 
 {-# NOINLINE hashlazy #-}
--- | hash a lazy bytestring into a digest bytestring (64 bytes)
+-- | hash a lazy bytestring into a digest bytestring (48 bytes)
 hashlazy :: L.ByteString -> ByteString
 hashlazy l = unsafeDoIO $ withCtxNewThrow $ \ptr -> do
-    c_sha512_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l) >> finalizeInternalIO ptr
+    c_sha384_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l) >> finalizeInternalIO ptr
 
 {-# NOINLINE hashlazyAndLength #-}
 -- | Variant of 'hashlazy' which simultaneously computes the hash and length of a lazy bytestring.
---
--- @since 0.11.101.0
 hashlazyAndLength :: L.ByteString -> (ByteString,Word64)
 hashlazyAndLength l = unsafeDoIO $ withCtxNewThrow $ \ptr ->
-    c_sha512_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l) >> finalizeInternalIO' ptr
+    c_sha384_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l) >> finalizeInternalIO' ptr
 
 {-# NOINLINE startlazy #-}
 -- | hash a lazy bytestring into a Ctx
---
--- @since 0.11.101.0
 startlazy :: L.ByteString -> Ctx
 startlazy l = unsafeDoIO $ withCtxNew $ \ptr -> do
-    c_sha512_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l)
+    c_sha384_init ptr >> mapM_ (updateInternalIO ptr) (L.toChunks l)
 
 {-# NOINLINE hmac #-}
--- | Compute 64-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
--- HMAC-SHA-512 digest for a strict bytestring message
---
--- @since 0.11.100.0
+-- | Compute 48-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
+-- HMAC-SHA-384 digest for a strict bytestring message
 hmac :: ByteString -- ^ secret
      -> ByteString -- ^ message
      -> ByteString
@@ -269,10 +260,8 @@ hmac secret msg = hash $ B.append opad (hash $ B.append ipad msg)
 
 
 {-# NOINLINE hmaclazy #-}
--- | Compute 64-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
--- HMAC-SHA-512 digest for a lazy bytestring message
---
--- @since 0.11.100.0
+-- | Compute 48-byte <https://tools.ietf.org/html/rfc2104 RFC2104>-compatible
+-- HMAC-SHA-384 digest for a lazy bytestring message
 hmaclazy :: ByteString   -- ^ secret
          -> L.ByteString -- ^ message
          -> ByteString
@@ -286,11 +275,9 @@ hmaclazy secret msg = hash $ B.append opad (hashlazy $ L.append ipad msg)
     pad = B.replicate (128 - B.length kt) 0
 
 -- | Variant of 'hmaclazy' which also returns length of message
---
--- @since 0.11.101.0
 hmaclazyAndLength :: ByteString   -- ^ secret
                   -> L.ByteString -- ^ message
-                  -> (ByteString,Word64) -- ^ digest (64 bytes) and length of message
+                  -> (ByteString,Word64) -- ^ digest (48 bytes) and length of message
 hmaclazyAndLength secret msg =
     (hash (B.append opad htmp), sz' - fromIntegral ipadLen)
   where

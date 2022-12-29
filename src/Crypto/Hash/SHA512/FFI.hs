@@ -35,12 +35,18 @@ import           Foreign.Ptr
 --
 --  * a 8-element 'Word64' array holding the current work-in-progress digest-value.
 --
--- Consequently, a SHA-512 digest as produced by 'hash', 'hashlazy', or 'finalize' is 64 bytes long.
 newtype Ctx = Ctx ByteString
   deriving (Eq)
 
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha384_init"
+    c_sha384_init :: Ptr Ctx -> IO ()
+
 foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_init"
     c_sha512_init :: Ptr Ctx -> IO ()
+
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512t_init"
+    c_sha512t_init :: Ptr Ctx -> Word16 -> IO ()
+
 
 foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_update"
     c_sha512_update_unsafe :: Ptr Ctx -> Ptr Word8 -> CSize -> IO ()
@@ -48,14 +54,28 @@ foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_update"
 foreign import capi safe "hs_sha512.h hs_cryptohash_sha512_update"
     c_sha512_update_safe :: Ptr Ctx -> Ptr Word8 -> CSize -> IO ()
 
-foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_finalize"
-    c_sha512_finalize :: Ptr Ctx -> Ptr Word8 -> IO ()
 
-foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_finalize"
-    c_sha512_finalize_len :: Ptr Ctx -> Ptr Word8 -> IO Word64
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512t_finalize"
+    c_sha512t_finalize :: Ptr Ctx -> Word16 -> Ptr Word8 -> IO ()
+
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512t_finalize"
+    c_sha512t_finalize_len :: Ptr Ctx -> Word16 -> Ptr Word8 -> IO Word64
+
+
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha384_hash"
+    c_sha384_hash_unsafe :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
+
+foreign import capi safe "hs_sha512.h hs_cryptohash_sha384_hash"
+    c_sha384_hash_safe :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
 
 foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512_hash"
     c_sha512_hash_unsafe :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
 
 foreign import capi safe "hs_sha512.h hs_cryptohash_sha512_hash"
     c_sha512_hash_safe :: Ptr Word8 -> CSize -> Ptr Word8 -> IO ()
+
+foreign import capi unsafe "hs_sha512.h hs_cryptohash_sha512t_hash"
+    c_sha512t_hash_unsafe :: Ptr Word8 -> CSize -> Ptr Word8 -> Word16 -> IO ()
+
+foreign import capi safe "hs_sha512.h hs_cryptohash_sha512t_hash"
+    c_sha512t_hash_safe :: Ptr Word8 -> CSize -> Ptr Word8 -> Word16 -> IO ()
