@@ -1,5 +1,10 @@
 See also http://pvp.haskell.org/faq
 
+## 0.11.103.0
+
+ - add `Crypto.Hash.SHA384.hkdf` and `Crypto.Hash.SHA512.hkdf` functions
+   providing HKDF-SHA384 and HKDF-SHA512 respectively, as per RFC5869
+
 ## 0.11.102.0
 
  - expose SHA512/t variant via new `Crypto.Hash.SHA512t` module

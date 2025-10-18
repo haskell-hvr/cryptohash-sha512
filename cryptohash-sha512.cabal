@@ -1,7 +1,6 @@
 cabal-version:       2.0
 name:                cryptohash-sha512
-version:             0.11.102.0
-x-revision:          5
+version:             0.11.103.0
 
 synopsis:            Fast, pure and practical SHA-512 implementation
 description: {
@@ -20,6 +19,8 @@ Additionally, this package provides support for
 - HMAC-SHA-384: SHA-384-based [Hashed Message Authentication Codes](https://en.wikipedia.org/wiki/HMAC) (HMAC)
 - HMAC-SHA-512: SHA-512-based [Hashed Message Authentication Codes](https://en.wikipedia.org/wiki/HMAC) (HMAC)
 - HMAC-SHA-512\/t: SHA-512\/t-based [Hashed Message Authentication Codes](https://en.wikipedia.org/wiki/HMAC) (HMAC)
+- HKDF-SHA-384: [HMAC-SHA-384-based Key Derivation Function](https://en.wikipedia.org/wiki/HKDF) (HKDF)
+- HKDF-SHA-512: [HMAC-SHA-512-based Key Derivation Function](https://en.wikipedia.org/wiki/HKDF) (HKDF)
 .
 conforming to [RFC6234](https://tools.ietf.org/html/rfc6234), [RFC4231](https://tools.ietf.org/html/rfc4231), [RFC5869](https://tools.ietf.org/html/rfc5869), et al..
 .

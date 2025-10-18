@@ -80,6 +80,12 @@ module Crypto.Hash.SHA384
     , hmac     -- :: ByteString -> ByteString -> ByteString
     , hmaclazy -- :: ByteString -> L.ByteString -> ByteString
     , hmaclazyAndLength -- :: ByteString -> L.ByteString -> (ByteString,Word64)
+
+    -- ** HKDF-SHA-384
+    --
+    -- | <https://tools.ietf.org/html/rfc5869 RFC5869>-compatible
+    -- <https://en.wikipedia.org/wiki/HKDF HKDF>-SHA-384 key derivation function
+    , hkdf
     ) where
 
 import Prelude hiding (init)
@@ -91,7 +97,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
 import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.ByteString.Internal (create, toForeignPtr, memcpy, mallocByteString)
+import Data.ByteString.Internal (create, createAndTrim, toForeignPtr, memcpy, mallocByteString)
 import Data.Bits (xor)
 import Data.Word
 import System.IO.Unsafe (unsafeDupablePerformIO)
@@ -290,3 +296,28 @@ hmaclazyAndLength secret msg =
     k'  = B.append kt pad
     kt  = if B.length secret > 128 then hash secret else secret
     pad = B.replicate (128 - B.length kt) 0
+
+{-# NOINLINE hkdf #-}
+-- | <https://tools.ietf.org/html/rfc6234 RFC6234>-compatible
+-- HKDF-SHA-384 key derivation function.
+--
+-- @since 0.11.103.0
+hkdf :: ByteString -- ^ /IKM/ Input keying material
+     -> ByteString -- ^ /salt/ Optional salt value, a non-secret random value (can be @""@)
+     -> ByteString -- ^ /info/ Optional context and application specific information (can be @""@)
+     -> Int        -- ^ /L/ length of output keying material in octets (at most 255 * 'digestSize' bytes)
+     -> ByteString -- ^ /OKM/ Output keying material (/L/ bytes)
+hkdf ikm salt info l
+  | l == 0 = B.empty
+  | 0 > l || l > 255*digestSize = error "hkdf: invalid L parameter"
+  | otherwise = unsafeDoIO $ createAndTrim (digestSize*fromIntegral cnt) (go 0 B.empty)
+  where
+    prk = hmac salt ikm
+    cnt = fromIntegral ((l+digestSize-1) `div` digestSize) :: Word8
+
+    go :: Word8 -> ByteString -> Ptr Word8 -> IO Int
+    go i t p | i == cnt  = return l
+             | otherwise = do
+                   let t' = hmaclazy prk (L.fromChunks [t,info,B.singleton (i+1)])
+                   withByteStringPtr t' $ \tptr' -> memcpy p tptr' digestSize
+                   go (i+1) t' $! (p `plusPtr` digestSize)
