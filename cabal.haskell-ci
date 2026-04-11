@@ -1,4 +1,6 @@
 branches: master
+error-unused-packages: False
+  -- package SHA is mentioned in common test-defaults but not used by every test
 benchmarks: <9.14
   -- 2026-04-11: microstache does not support GHC 9.14 yet
 
